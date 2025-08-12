@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Consumo de kWh</title>
+    <!-- Incluir Tailwind CSS para un diseño moderno y responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilo personalizado para la fuente Inter y el fondo */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e2e8f0; /* Un gris azulado más suave */
+        }
+        /* Estilos mejorados para la tabla, incluyendo "efecto cebra" */
+        .consumption-table thead {
+            background-color: #e2e8f0; /* Fondo más claro para el encabezado */
+        }
+        .consumption-table tbody tr:nth-child(even) {
+            background-color: #f8fafc; /* Gris muy claro para filas pares */
+        }
+        .consumption-table tbody tr:hover {
+            background-color: #f1f5f9; /* Efecto de hover sutil */
+        }
+        /* Estilo para las casillas de verificación */
+        .form-checkbox {
+            cursor: pointer;
+            border-color: #cbd5e1;
+        }
+        .form-checkbox:checked {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+        /* Transiciones para elementos interactivos */
+        input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Se ha cambiado la clase max-w-4xl por max-w-6xl para un contenedor más ancho -->
+    <div class="bg-white rounded-xl shadow-2xl p-6 sm:p-8 w-full max-w-6xl space-y-8">
+
+        <!-- Título y descripción -->
+        <div class="text-center">
+            <h1 class="text-4xl font-extrabold text-gray-900">Registro de Consumo de Electricidad</h1>
+            <p class="text-gray-600 mt-2 text-lg">Introduce las lecturas de los medidores y el precio por kWh para calcular el consumo mensual.</p>
+        </div>
+
+        <!-- Autenticación del usuario -->
+        <div class="flex items-center justify-between text-sm text-gray-600">
+            <span id="user-info">Cargando usuario...</span>
+            <button id="logout-btn" class="hidden py-2 px-4 border border-transparent shadow-sm font-bold rounded-lg text-white bg-gray-500 hover:bg-gray-600 focus:outline-none transition duration-150 ease-in-out">
+                Cerrar Sesión
+            </button>
+        </div>
+
+        <!-- Formulario de entrada de datos -->
+        <form id="consumption-form" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label for="date-input" class="block text-sm font-semibold text-gray-700 mb-1">Fecha</label>
+                    <input type="date" id="date-input" required class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm transition duration-150 ease-in-out focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="tenant1-kwh" class="block text-sm font-semibold text-gray-700 mb-1">Inquilino 1 (kWh)</label>
+                    <!-- Se ha añadido el atributo step="0.01" para permitir decimales -->
+                    <input type="number" id="tenant1-kwh" placeholder="Ej: 1500.50" required step="0.01" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm transition duration-150 ease-in-out focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="tenant2-kwh" class="block text-sm font-semibold text-gray-700 mb-1">Inquilino 2 (kWh)</label>
+                    <!-- Se ha añadido el atributo step="0.01" para permitir decimales -->
+                    <input type="number" id="tenant2-kwh" placeholder="Ej: 1250.75" required step="0.01" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm transition duration-150 ease-in-out focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="price-kwh" class="block text-sm font-semibold text-gray-700 mb-1">Precio por kWh (S/)</label>
+                    <input type="number" id="price-kwh" placeholder="Ej: 0.15" required step="0.01" class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm transition duration-150 ease-in-out focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+            <div class="flex flex-col sm:flex-row justify-end gap-2">
+                <!-- Se ha deshabilitado el botón de borrar todos los datos. -->
+                <button type="button" id="clear-all-data-btn" class="w-full sm:w-auto inline-flex items-center justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-bold rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out">
+                    Borrar todos los datos
+                </button>
+                <button type="submit" class="w-full sm:w-auto inline-flex items-center justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-bold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                    Guardar y Calcular
+                </button>
+            </div>
+        </form>
+
+        <!-- Historial de consumos y cálculos -->
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Historial de Lecturas y Cálculos</h2>
+            <div id="message-box" class="hidden mb-4 p-4 rounded-lg text-sm bg-green-100 text-green-700 border border-green-200"></div>
+
+            <!-- El contenedor ahora tiene overflow-x-auto, la sombra y el borde redondeado -->
+            <div class="table-container shadow-md rounded-lg overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 consumption-table">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Inquilino 1 (kWh)</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Consumo Mensual (kWh)</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Costo Inquilino 1 (S/)</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Pagado</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Inquilino 2 (kWh)</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Consumo Mensual (kWh)</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Costo Inquilino 2 (S/)</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Pagado</th>
+                            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body" class="bg-white divide-y divide-gray-100">
+                        <!-- Las filas del historial se insertarán aquí por JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            <!-- Botón para guardar los cambios de pago -->
+            <div class="flex justify-end mt-4">
+                <button type="button" id="save-payments-btn" class="hidden py-2 px-6 border border-transparent shadow-sm text-sm font-bold rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out">
+                    Guardar pagos
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signOut, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, writeBatch, deleteDoc, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase configuration (provided by the environment)
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : '';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // Initialize Firebase
+        let app, auth, db;
+        try {
+            if (Object.keys(firebaseConfig).length === 0) {
+                throw new Error("Firebase configuration is missing.");
+            }
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) {
+            console.error("Error initializing Firebase:", e);
+            document.getElementById('user-info').textContent = "Error: Configuración de Firebase no válida.";
+            document.body.innerHTML = `
+                <div class="bg-white rounded-xl shadow-2xl p-6 sm:p-8 w-full max-w-lg space-y-4 text-center">
+                    <h1 class="text-3xl font-extrabold text-red-600">Error de Configuración</h1>
+                    <p class="text-gray-700">La aplicación no se puede iniciar debido a una configuración de Firebase no válida. Por favor, contacta al administrador.</p>
+                </div>
+            `;
+            throw e;
+        }
+
+        // UI Elements
+        const form = document.getElementById('consumption-form');
+        const dateInput = document.getElementById('date-input');
+        const tenant1KwhInput = document.getElementById('tenant1-kwh');
+        const tenant2KwhInput = document.getElementById('tenant2-kwh');
+        const priceKwhInput = document.getElementById('price-kwh');
+        const historyTableBody = document.getElementById('history-table-body');
+        const messageBox = document.getElementById('message-box');
+        const clearAllDataBtn = document.getElementById('clear-all-data-btn');
+        const savePaymentsBtn = document.getElementById('save-payments-btn');
+        const userInfoSpan = document.getElementById('user-info');
+        const logoutBtn = document.getElementById('logout-btn');
+        
+        let userId;
+
+        // Set default date to today's date
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.value = today;
+
+        // Function to show a temporary message
+        function showMessage(text, isError = false) {
+            messageBox.textContent = text;
+            messageBox.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'border-green-200', 'bg-red-100', 'text-red-700', 'border-red-200');
+            if (isError) {
+                messageBox.classList.add('bg-red-100', 'text-red-700', 'border-red-200');
+            } else {
+                messageBox.classList.add('bg-green-100', 'text-green-700', 'border-green-200');
+            }
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Function to save the price to Firestore
+        async function savePriceToFirestore(price) {
+            if (!userId) return;
+            try {
+                const docRef = doc(db, `/artifacts/${appId}/users/${userId}/app_data/price`);
+                await setDoc(docRef, { price: parseFloat(price) });
+            } catch (e) {
+                console.error("Error al guardar el precio en Firestore:", e);
+                showMessage("Error al guardar el precio. Inténtalo de nuevo.", true);
+            }
+        }
+
+        // Function to fetch the price from Firestore
+        async function fetchPriceFromFirestore() {
+            if (!userId) return;
+            try {
+                const docRef = doc(db, `/artifacts/${appId}/users/${userId}/app_data/price`);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    priceKwhInput.value = docSnap.data().price;
+                }
+            } catch (e) {
+                console.error("Error al obtener el precio de Firestore:", e);
+            }
+        }
+
+        // Function to render the history table from Firestore data
+        function renderHistoryTable(data) {
+            historyTableBody.innerHTML = ''; // Clear the table body
+            
+            if (data.length === 0) {
+                const noDataRow = `
+                    <tr class="text-center">
+                        <td colspan="10" class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">
+                            No hay datos registrados aún.
+                        </td>
+                    </tr>
+                `;
+                historyTableBody.innerHTML = noDataRow;
+                return;
+            }
+
+            // Sort data by date in descending order
+            data.sort((a, b) => new Date(b.date) - new Date(a.date));
+            const precioKwh = parseFloat(priceKwhInput.value) || 0;
+
+            data.forEach((entry, index) => {
+                const prevEntry = data[index + 1]; // Get the previous entry for calculation
+                
+                let consumption1 = 'N/A';
+                let cost1 = 'N/A';
+                let consumption2 = 'N/A';
+                let cost2 = 'N/A';
+
+                if (prevEntry) {
+                    consumption1 = (entry.tenant1 - prevEntry.tenant1).toFixed(2);
+                    cost1 = (consumption1 * precioKwh).toFixed(2);
+                    consumption2 = (entry.tenant2 - prevEntry.tenant2).toFixed(2);
+                    cost2 = (consumption2 * precioKwh).toFixed(2);
+                }
+                
+                const newRow = document.createElement('tr');
+                newRow.innerHTML = `
+                    <td class="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${entry.date}</td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">${entry.tenant1} kWh</td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">${consumption1} kWh</td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">S/${cost1}</td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                        <input type="checkbox" data-id="${entry.id}" data-tenant="1" class="form-checkbox h-4 w-4 text-blue-600 rounded"${entry.paid1 ? ' checked' : ''}>
+                    </td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">${entry.tenant2} kWh</td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">${consumption2} kWh</td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">S/${cost2}</td>
+                    <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                        <input type="checkbox" data-id="${entry.id}" data-tenant="2" class="form-checkbox h-4 w-4 text-blue-600 rounded"${entry.paid2 ? ' checked' : ''}>
+                    </td>
+                    <td class="px-3 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button data-id="${entry.id}" class="delete-btn text-red-600 hover:text-red-900 transition-colors duration-150 ease-in-out">
+                            Eliminar
+                        </button>
+                    </td>
+                `;
+                historyTableBody.appendChild(newRow);
+            });
+
+            // Add event listeners for the delete buttons
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', (event) => {
+                    const id = event.target.getAttribute('data-id');
+                    deleteConsumptionEntry(id);
+                });
+            });
+
+            // Add event listeners for the checkboxes
+            document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', () => {
+                    // Show save button when a checkbox is changed
+                    savePaymentsBtn.classList.remove('hidden');
+                });
+            });
+        }
+
+        // Function to delete a consumption entry from Firestore
+        async function deleteConsumptionEntry(id) {
+            if (!userId) return;
+            try {
+                const docRef = doc(db, `/artifacts/${appId}/users/${userId}/kwh_readings/${id}`);
+                await deleteDoc(docRef);
+                showMessage('Registro eliminado correctamente.');
+            } catch (e) {
+                console.error("Error al eliminar el documento:", e);
+                showMessage("Error al eliminar el registro. Inténtalo de nuevo.", true);
+            }
+        }
+        
+        // Function to save payment changes to Firestore
+        async function savePaymentChanges() {
+            if (!userId) return;
+            try {
+                const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+                const updates = {};
+                checkboxes.forEach(checkbox => {
+                    const id = checkbox.getAttribute('data-id');
+                    const tenant = checkbox.getAttribute('data-tenant');
+                    const isChecked = checkbox.checked;
+                    updates[id] = updates[id] || {};
+                    if (tenant === '1') {
+                        updates[id].paid1 = isChecked;
+                    } else {
+                        updates[id].paid2 = isChecked;
+                    }
+                });
+
+                for (const id in updates) {
+                    const docRef = doc(db, `/artifacts/${appId}/users/${userId}/kwh_readings/${id}`);
+                    await setDoc(docRef, updates[id], { merge: true });
+                }
+
+                savePaymentsBtn.classList.add('hidden'); // Hide the button after saving
+                showMessage('Cambios de pago guardados con éxito.');
+            } catch (e) {
+                console.error("Error al guardar los pagos en Firestore:", e);
+                showMessage("Error al guardar los pagos. Inténtalo de nuevo.", true);
+            }
+        }
+
+        // Handle form submission
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault(); // Prevent the form from refreshing the page
+            if (!userId) {
+                showMessage("Debes iniciar sesión para guardar datos.", true);
+                return;
+            }
+
+            const date = dateInput.value;
+            const tenant1Kwh = parseFloat(tenant1KwhInput.value);
+            const tenant2Kwh = parseFloat(tenant2KwhInput.value);
+            
+            // Simple validation
+            if (isNaN(tenant1Kwh) || isNaN(tenant2Kwh)) {
+                showMessage('Por favor, ingresa lecturas válidas en kWh.', true);
+                return;
+            }
+
+            const newEntry = {
+                date: date,
+                tenant1: tenant1Kwh,
+                tenant2: tenant2Kwh,
+                paid1: false,
+                paid2: false
+            };
+
+            try {
+                const docRef = doc(collection(db, `/artifacts/${appId}/users/${userId}/kwh_readings`));
+                await setDoc(docRef, newEntry);
+                
+                // Reset form fields
+                tenant1KwhInput.value = '';
+                tenant2KwhInput.value = '';
+
+                showMessage('¡Lecturas y cálculos guardados con éxito!');
+            } catch (e) {
+                console.error("Error al añadir el documento a Firestore:", e);
+                showMessage("Error al guardar el registro. Inténtalo de nuevo.", true);
+            }
+        });
+        
+        // Add a listener to the price input to save the price to Firestore
+        priceKwhInput.addEventListener('input', () => {
+            savePriceToFirestore(priceKwhInput.value);
+        });
+
+        // Handle "Clear All Data" button click
+        clearAllDataBtn.addEventListener('click', async () => {
+            if (confirm("¿Estás seguro de que quieres borrar todos los datos? Esta acción es irreversible.")) {
+                if (!userId) return;
+                try {
+                    const q = query(collection(db, `/artifacts/${appId}/users/${userId}/kwh_readings`));
+                    const querySnapshot = await getDocs(q);
+                    const batch = writeBatch(db);
+                    querySnapshot.forEach((doc) => {
+                        batch.delete(doc.ref);
+                    });
+                    await batch.commit();
+
+                    const priceDocRef = doc(db, `/artifacts/${appId}/users/${userId}/app_data/price`);
+                    await deleteDoc(priceDocRef);
+
+                    priceKwhInput.value = '';
+                    showMessage('Todos los datos han sido borrados.');
+                } catch (e) {
+                    console.error("Error al borrar todos los datos:", e);
+                    showMessage("Error al borrar los datos. Inténtalo de nuevo.", true);
+                }
+            }
+        });
+
+        // Handle "Save Payments" button click
+        savePaymentsBtn.addEventListener('click', savePaymentChanges);
+        
+        logoutBtn.addEventListener('click', async () => {
+            await signOut(auth);
+            showMessage('Sesión cerrada. Los datos locales han sido borrados.');
+            // Clear local state and UI after logout
+            historyTableBody.innerHTML = '';
+            priceKwhInput.value = '';
+            userInfoSpan.textContent = 'Cargando usuario...';
+            logoutBtn.classList.add('hidden');
+            clearAllDataBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            clearAllDataBtn.disabled = true;
+        });
+
+        // Listen for authentication state changes
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                userInfoSpan.textContent = `ID de usuario: ${userId}`;
+                logoutBtn.classList.remove('hidden');
+                clearAllDataBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                clearAllDataBtn.disabled = false;
+
+                // Now that we have a user, set up a real-time listener for their data
+                const q = collection(db, `/artifacts/${appId}/users/${userId}/kwh_readings`);
+                onSnapshot(q, (snapshot) => {
+                    const data = [];
+                    snapshot.forEach((doc) => {
+                        data.push({ id: doc.id, ...doc.data() });
+                    });
+                    renderHistoryTable(data);
+                });
+
+                // Fetch and set the saved price
+                fetchPriceFromFirestore();
+
+            } else {
+                userId = null;
+                // Sign in anonymously to get a user ID
+                try {
+                    if (initialAuthToken) {
+                        await signInWithCustomToken(auth, initialAuthToken);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                } catch (error) {
+                    console.error("Error signing in:", error);
+                    userInfoSpan.textContent = "Error al iniciar sesión.";
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
+
